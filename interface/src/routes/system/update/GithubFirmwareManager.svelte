@@ -99,7 +99,7 @@
 		<Github  class="lex-shrink-0 mr-2 h-6 w-6 self-end rounded-full" />
 	{/snippet}
 	{#snippet title()}
-		<span >Github Firmware Manager</span>
+		<span >Firmware updater</span>
 	{/snippet}
 	{#await getGithubAPI()}
 		<Spinner />
