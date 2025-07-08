@@ -1,4 +1,4 @@
-site_name: ESP32 SvelteKit
+site_name: Surfeed Automation
 
 nav:
   - Home: index.md
@@ -19,8 +19,8 @@ site_description: >-
   A simple, secure and extensible framework for IoT projects on ESP32 platforms with responsive Sveltekit front-end built with TailwindCSS and DaisyUI.
 
 # Repository
-repo_name: theelims/ESP32-sveltekit
-repo_url: https://github.com/theelims/ESP32-sveltekit
+repo_name: kg9316/ESP32-sveltekit
+repo_url: https://github.com/kg9316/ESP32-sveltekit
 
 theme:
   name: material

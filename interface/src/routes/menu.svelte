@@ -22,7 +22,7 @@
 
 	let { closeMenu } = $props();
 
-	const github = { href: 'https://github.com/' + page.data.github, active: true };
+	const github = { href: 'https://github.com/' + page.data.github, active: false };
 
 	const discord = { href: '.', active: false };
 
@@ -45,13 +45,13 @@
 
 	let menuItems = $state([
 		{
-			title: 'Demo App',
+			title: 'Feeder',
 			icon: Control,
 			href: '/demo',
 			feature: true
 		},
 		{
-			title: 'Connections',
+			title: 'Kommunikasjon',
 			icon: Remote,
 			feature: page.data.features.mqtt || page.data.features.ntp,
 			submenu: [
@@ -63,6 +63,24 @@
 				},
 				{
 					title: 'NTP',
+					icon: NTP,
+					href: '/connections/ntp',
+					feature: page.data.features.ntp
+				},
+				{
+					title: 'Modbus RTU',
+					icon: NTP,
+					href: '/connections/ntp',
+					feature: page.data.features.ntp
+				},
+				{
+					title: 'Modbus TCP',
+					icon: NTP,
+					href: '/connections/ntp',
+					feature: page.data.features.ntp
+				},
+				{
+					title: 'OPC UA',
 					icon: NTP,
 					href: '/connections/ntp',
 					feature: page.data.features.ntp
@@ -89,7 +107,7 @@
 			]
 		},
 		{
-			title: 'Users',
+			title: 'Brukere',
 			icon: Users,
 			href: '/user',
 			feature: page.data.features.security && $user.admin
