@@ -7,6 +7,14 @@
   import type { LightState, DemoTelemetry, SequenceStatus } from '$lib/types/models';
   import SDK from '~icons/tabler/ruler-2';
   import CPU from '~icons/tabler/scale';
+  // Icons for controls
+  import ArrowUp from '~icons/tabler/arrow-up';
+  import ArrowDown from '~icons/tabler/arrow-down';
+  import Rotate from '~icons/tabler/rotate-2';
+  import Stop from '~icons/tabler/player-stop';
+  import Home from '~icons/tabler/home';
+  import Alert from '~icons/tabler/alert-triangle';
+  import Play from '~icons/tabler/player-play';
 
   // Local state for LED and timers
   let lightState: LightState = { led_on: false, retect_seconds: 30, feed_seconds: 30, target_distance_cm: 30, return_distance_cm: 30 };
@@ -212,22 +220,44 @@
 
       <div class="w-full mt-2 max-w-sm flex gap-2">
         <button
-          class="btn btn-primary flex-1"
+          class="btn btn-primary btn-lg flex-1"
           disabled={running}
           onclick={startSequence}
+          aria-label="Start sekvens"
         >
+          {#if !running}
+            <Play class="h-6 w-6 mr-2" />
+          {/if}
           {running ? 'Kjører sekvens…' : 'Start sekvens'}
         </button>
-        <button class="btn btn-error flex-none" disabled={!running} onclick={abortSequence}>Nødstopp</button>
+        <button class="btn btn-error btn-lg flex-none" disabled={!running} onclick={abortSequence} aria-label="Nødstopp">
+          <Alert class="h-6 w-6 mr-2" />
+          Nødstopp
+        </button>
       </div>
 
       <!-- Manual controls: Jog/Feed/Home -->
       <div class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 max-w-xl">
-        <button class="btn btn-secondary" onclick={jogUpStart} disabled={running}>Jog opp</button>
-        <button class="btn btn-secondary" onclick={jogDownStart} disabled={running}>Jog ned</button>
-        <button class="btn btn-success" onclick={feedStart} disabled={running}>Jog mater</button>
-        <button class="btn btn-warning" onclick={jogStop}>Jog Stopp</button>
-        <button class="btn btn-accent col-span-2 md:col-span-1" onclick={returnHome} disabled={running}>Returner hjem</button>
+        <button class="btn btn-secondary btn-sm md:btn-md" onclick={jogUpStart} disabled={running} aria-label="Jog opp">
+          <ArrowUp class="h-5 w-5 mr-2" />
+          Opp
+        </button>
+        <button class="btn btn-secondary btn-sm md:btn-md" onclick={jogDownStart} disabled={running} aria-label="Jog ned">
+          <ArrowDown class="h-5 w-5 mr-2" />
+          Ned
+        </button>
+        <button class="btn btn-success btn-sm md:btn-md" onclick={feedStart} disabled={running} aria-label="Start mating">
+          <Rotate class="h-5 w-5 mr-2" />
+          Mater
+        </button>
+        <button class="btn btn-warning btn-sm md:btn-md" onclick={jogStop} aria-label="Stopp">
+          <Stop class="h-5 w-5 mr-2" />
+          Stopp
+        </button>
+        <button class="btn btn-accent btn-sm md:btn-md col-span-2 md:col-span-1" onclick={returnHome} disabled={running} aria-label="Returner hjem">
+          <Home class="h-5 w-5 mr-2" />
+          Hjem
+        </button>
       </div>
 
   <!-- Target Down Distance, Feed Seconds and Return Distance Sliders in Horizontal Layout -->

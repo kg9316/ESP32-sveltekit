@@ -1263,14 +1263,14 @@ void ToneTask(void *param)
 
     switch (which)
     {
-    case 0: // boot jingle
+    case 0: // Boot jingle (two short beeps)
+        beep(880, 80, 60);
+        beep(880, 100, 0);
+        break;
+    case 1: // AP mode
         beep(880, 100, 40);
         beep(1047, 100, 40);
         beep(1319, 160, 0);
-        break;
-    case 1: // AP mode (two short beeps)
-        beep(880, 80, 60);
-        beep(880, 100, 0);
         break;
     case 2: // STA connected (ascending chime)
         beep(1319, 120, 40);
