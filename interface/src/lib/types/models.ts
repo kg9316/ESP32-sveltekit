@@ -58,6 +58,52 @@ export type ApSettings = {
 
 export type LightState = {
 	led_on: boolean;
+	retect_seconds: number;
+	feed_seconds: number;
+	target_distance_cm?: number;
+	return_distance_cm?: number;
+	auto_interval_min?: number; // 0 = off, 1-60 = minutes between automatic runs
+
+};
+
+// Live telemetry payload from firmware (event: "demo")
+export type DemoTelemetry = {
+	weight_g: number;      // current weight in grams
+	distance_mm: number;   // current distance in millimeters (0 = out of range)
+	endstop?: boolean;     // optional: endstop state
+	di_mask?: number;      // optional: bitmask of DI inputs (debug)
+	next_start_in_s?: number; // optional: seconds until next auto-start (when enabled)
+};
+
+export interface SequenceParams {
+	target_distance_cm: number; // stop when distance sensor reaches this
+	feed_seconds: number;       // run feeder (relay 4)
+	return_distance_cm: number; // absolute distance target to return to after feed
+}
+
+export type SequencePhase =
+	| 'standby'
+	| 'approach'
+	| 'feed'
+	| 'retract'
+	| 'manual_feed'
+	| 'jog_up'
+	| 'jog_down'
+	| 'home'
+	| 'done'
+	| 'aborted'
+	| 'endstop';
+
+export type SequenceStatus = {
+	phase: SequencePhase;
+	running: boolean;
+	distance_mm: number;
+	start_distance_mm?: number;
+	target_down_mm?: number;
+	return_target_mm?: number;
+	endstop?: boolean;
+	di_mask?: number;
+	reason?: string;
 };
 
 export type BrokerSettings = {

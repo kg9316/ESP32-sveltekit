@@ -29,6 +29,7 @@
 	let { data, children }: Props = $props();
 
 	onMount(async () => {
+		telemetry.setRSSI({ rssi: 0, ssid: '' });
 		if ($user.bearer_token !== '') {
 			await validateUser($user);
 		}
@@ -89,12 +90,19 @@
 	}
 
 	const handleOpen = () => {
-		notifications.success('Connection to device established', 5000);
+		notifications.success('Connection to device established', 1000);
 	};
 
-	const handleClose = () => {
-		notifications.error('Connection to device lost', 5000);
+	const handleClose = (event?: CloseEvent) => {
+		notifications.error('Connection to device lost', 1000);
 		telemetry.setRSSI({ rssi: 0, ssid: '' });
+		if (event) {
+			console.warn(
+				`[WS] close code=${event.code} reason="${event.reason}" wasClean=${event.wasClean}`
+			);
+		} else {
+			console.warn('[WS] close event is undefined');
+		}
 	};
 
 	const handleError = (data: any) => console.error(data);

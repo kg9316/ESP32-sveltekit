@@ -13,6 +13,7 @@
  **/
 
 #include <LightStateService.h>
+#include <M5StamPLC.h>
 
 LightStateService::LightStateService(PsychicHttpServer *server,
                                      ESP32SvelteKit *sveltekit,
@@ -39,6 +40,11 @@ LightStateService::LightStateService(PsychicHttpServer *server,
                                                                                                             LIGHT_SETTINGS_SOCKET_PATH,
                                                                                                             sveltekit->getSecurityManager(),
                                                                                                             AuthenticationPredicates::IS_AUTHENTICATED),
+                                                                                           _fsPersistence(LightState::read,
+                                                                                                         LightState::update,
+                                                                                                         this,
+                                                                                                         sveltekit->getFS(),
+                                                                                                         "/config/lightState.json"),
                                                                                            _mqttClient(sveltekit->getMqttClient()),
                                                                                            _lightMqttSettingsService(lightMqttSettingsService)
 {
@@ -63,16 +69,32 @@ void LightStateService::begin()
 {
     _httpEndpoint.begin();
     _eventEndpoint.begin();
-    _state.ledOn = DEFAULT_LED_STATE;
+    // Set defaults, then read from FS to override if present
+    updateWithoutPropagation([&](LightState &s) {
+        s.ledOn = DEFAULT_LED_STATE;
+        s.retect_seconds = DEFAULT_RETECT_SECONDS;
+        s.feed_seconds = DEFAULT_FEED_SECONDS;
+    s.target_distance_cm = DEFAULT_TARGET_DISTANCE_CM;
+    s.return_distance_cm = DEFAULT_RETURN_DISTANCE_CM;
+    s.auto_interval_min = 0;
+        return StateUpdateResult::CHANGED; });
+    _fsPersistence.readFromFS();
     onConfigUpdated();
 }
 
 void LightStateService::onConfigUpdated()
 {
-    digitalWrite(LED_BUILTIN, _state.ledOn ? 1 : 0);
-}
+    //digitalWrite(LED_BUILTIN, _state.ledOn ? 1 : 0);
+    if (_state.ledOn)
+        M5StamPLC.writePlcRelay(0,true); // Turn on relay 1
+    else
+        M5StamPLC.writePlcRelay(0,false); // Turn off relay 1
 
-void LightStateService::registerConfig()
+    // Apply scheduler interval to global timer in main.cpp
+    extern void applySequenceIntervalFromSettings(int minutes);
+    applySequenceIntervalFromSettings(_state.auto_interval_min);
+}
+         void LightStateService::registerConfig()
 {
     if (!_mqttClient->connected())
     {
@@ -102,3 +124,7 @@ void LightStateService::registerConfig()
 
     _mqttEndpoint.configureTopics(pubTopic, subTopic);
 }
+
+
+
+

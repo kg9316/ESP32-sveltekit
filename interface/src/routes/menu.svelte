@@ -23,7 +23,7 @@
 
 	let { closeMenu } = $props();
 
-	const github = { href: 'https://github.com/' + page.data.github, active: true };
+	const github = { href: 'https://github.com/' + page.data.github, active: false };
 
 	const discord = { href: '.', active: false };
 
@@ -46,7 +46,7 @@
 
 	let menuItems = $state([
 		{
-			title: 'Demo App',
+			title: 'Demo Surfeeder',
 			icon: Control,
 			href: '/demo',
 			feature: true

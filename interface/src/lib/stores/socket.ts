@@ -6,8 +6,8 @@ function createWebSocket() {
 	const { subscribe, set } = writable(false);
 	const socketEvents = ['open', 'close', 'error', 'message', 'unresponsive'] as const;
 	type SocketEvent = (typeof socketEvents)[number];
-	let unresponsiveTimeoutId: number;
-	let reconnectTimeoutId: number;
+	let unresponsiveTimeoutId: ReturnType<typeof setTimeout>;
+	let reconnectTimeoutId: ReturnType<typeof setTimeout>;
 	let ws: WebSocket;
 	let socketUrl: string | URL;
 	let event_use_json = false;
@@ -25,7 +25,7 @@ function createWebSocket() {
 		clearTimeout(unresponsiveTimeoutId);
 		clearTimeout(reconnectTimeoutId);
 		listeners.get(reason)?.forEach((listener) => listener(event));
-		reconnectTimeoutId = setTimeout(connect, 1000);
+		reconnectTimeoutId = setTimeout(connect, 100);
 	}
 
 	function connect() {
@@ -77,7 +77,7 @@ function createWebSocket() {
 
 	function resetUnresponsiveCheck() {
 		clearTimeout(unresponsiveTimeoutId);
-		unresponsiveTimeoutId = setTimeout(() => disconnect('unresponsive'), 2000);
+		unresponsiveTimeoutId = setTimeout(() => disconnect('unresponsive'), 10000);
 	}
 
 	function send(msg: unknown) {

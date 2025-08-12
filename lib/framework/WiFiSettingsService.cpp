@@ -14,6 +14,10 @@
 
 #include <WiFiSettingsService.h>
 
+#ifndef WIFI_SCAN_MAX_MS_PER_CHAN
+#define WIFI_SCAN_MAX_MS_PER_CHAN 500
+#endif
+
 WiFiSettingsService::WiFiSettingsService(PsychicHttpServer *server,
                                          FS *fs,
                                          SecurityManager *securityManager,
@@ -142,8 +146,15 @@ void WiFiSettingsService::connectToWiFi()
         network.available = false;
     }
 
-    // scanning for available networks
-    int scanResult = WiFi.scanNetworks();
+    // scanning for available networks (longer per-channel dwell to catch weaker APs)
+    // signature: scanNetworks(async, show_hidden, passive, max_ms_per_chan, channel, ssid)
+    int scanResult = WiFi.scanNetworks(
+        /*async=*/false,
+        /*show_hidden=*/false,
+        /*passive=*/false,
+        /*max_ms_per_chan=*/WIFI_SCAN_MAX_MS_PER_CHAN,
+        /*channel=*/0,
+        /*ssid=*/nullptr);
     if (scanResult == WIFI_SCAN_FAILED)
     {
         ESP_LOGE(SVK_TAG, "WiFi scan failed.");

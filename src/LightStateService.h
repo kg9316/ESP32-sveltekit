@@ -16,6 +16,7 @@
  **/
 
 #include <LightMqttSettingsService.h>
+#include <FSPersistence.h>
 
 #include <EventSocket.h>
 #include <HttpEndpoint.h>
@@ -25,6 +26,10 @@
 #include <ESP32SvelteKit.h>
 
 #define DEFAULT_LED_STATE false
+#define DEFAULT_RETECT_SECONDS 30
+#define DEFAULT_FEED_SECONDS 30
+#define DEFAULT_TARGET_DISTANCE_CM 30
+#define DEFAULT_RETURN_DISTANCE_CM 30
 #define OFF_STATE "OFF"
 #define ON_STATE "ON"
 
@@ -36,21 +41,67 @@ class LightState
 {
 public:
     bool ledOn;
+    int retect_seconds; // seconds to retract
+    int feed_seconds;   // seconds to feed
+    int target_distance_cm; // lower position target during approach (cm)
+    int return_distance_cm; // absolute distance target to return to
+    int auto_interval_min; // minutes between automatic runs (0=off)
 
     static void read(LightState &settings, JsonObject &root)
     {
         root["led_on"] = settings.ledOn;
+    root["retect_seconds"] = settings.retect_seconds;
+    root["feed_seconds"] = settings.feed_seconds;
+    root["target_distance_cm"] = settings.target_distance_cm;
+    root["return_distance_cm"] = settings.return_distance_cm;
+    root["auto_interval_min"] = settings.auto_interval_min;
     }
 
     static StateUpdateResult update(JsonObject &root, LightState &lightState)
     {
-        boolean newState = root["led_on"] | DEFAULT_LED_STATE;
-        if (lightState.ledOn != newState)
+        StateUpdateResult result = StateUpdateResult::UNCHANGED;
+        bool newLed = root["led_on"] | DEFAULT_LED_STATE;
+        int newRetract = root["retect_seconds"] | DEFAULT_RETECT_SECONDS;
+        int newFeed = root["feed_seconds"] | DEFAULT_FEED_SECONDS;
+    int newTarget = root["target_distance_cm"] | DEFAULT_TARGET_DISTANCE_CM;
+    int newReturn = root["return_distance_cm"] | DEFAULT_RETURN_DISTANCE_CM;
+    int newAutoInterval = root["auto_interval_min"] | 0;
+
+        if (lightState.ledOn != newLed)
         {
-            lightState.ledOn = newState;
-            return StateUpdateResult::CHANGED;
+            lightState.ledOn = newLed;
+            result = StateUpdateResult::CHANGED;
         }
-        return StateUpdateResult::UNCHANGED;
+        if (lightState.retect_seconds != newRetract)
+        {
+            lightState.retect_seconds = newRetract;
+            result = StateUpdateResult::CHANGED;
+        }
+        if (lightState.feed_seconds != newFeed)
+        {
+            lightState.feed_seconds = newFeed;
+            result = StateUpdateResult::CHANGED;
+        }
+        if (lightState.target_distance_cm != newTarget)
+        {
+            // clamp to sane range (10..200 cm)
+            if (newTarget < 10) newTarget = 10; if (newTarget > 200) newTarget = 200;
+            lightState.target_distance_cm = newTarget;
+            result = StateUpdateResult::CHANGED;
+        }
+        if (lightState.return_distance_cm != newReturn)
+        {
+            if (newReturn < 10) newReturn = 10; if (newReturn > 200) newReturn = 200;
+            lightState.return_distance_cm = newReturn;
+            result = StateUpdateResult::CHANGED;
+        }
+        if (newAutoInterval < 0) newAutoInterval = 0; if (newAutoInterval > 60) newAutoInterval = 60;
+        if (lightState.auto_interval_min != newAutoInterval)
+        {
+            lightState.auto_interval_min = newAutoInterval;
+            result = StateUpdateResult::CHANGED;
+        }
+        return result;
     }
 
     static void homeAssistRead(LightState &settings, JsonObject &root)
@@ -89,12 +140,15 @@ public:
                       LightMqttSettingsService *lightMqttSettingsService);
 
     void begin();
+    // Getter for current persisted state
+    const LightState& getCurrentState() const { return _state; }
 
 private:
     HttpEndpoint<LightState> _httpEndpoint;
     EventEndpoint<LightState> _eventEndpoint;
     MqttEndpoint<LightState> _mqttEndpoint;
     WebSocketServer<LightState> _webSocketServer;
+    FSPersistence<LightState> _fsPersistence;
     PsychicMqttClient *_mqttClient;
     LightMqttSettingsService *_lightMqttSettingsService;
 

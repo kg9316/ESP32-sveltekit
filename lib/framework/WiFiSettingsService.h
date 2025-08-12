@@ -40,7 +40,7 @@
 #endif
 
 #ifndef FACTORY_WIFI_RSSI_THRESHOLD
-#define FACTORY_WIFI_RSSI_THRESHOLD -80
+#define FACTORY_WIFI_RSSI_THRESHOLD -90
 #endif
 
 #define WIFI_SETTINGS_FILE "/config/wifiSettings.json"
