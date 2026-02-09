@@ -69,7 +69,7 @@ static volatile bool abortRequested = false;
 static bool lastEndstop = false; // cached endstop state
 // Endstop wiring assumptions (can adjust after field test)
 static constexpr uint8_t ENDSTOP_INPUT_INDEX = 0; // DI1 (index 0)
-static constexpr bool ENDSTOP_ACTIVE_LOW = true; // adjusted: endstop is active-low on this hardware
+static constexpr bool ENDSTOP_ACTIVE_LOW = false; // adjusted: endstop is active-low on this hardware
 
 // Relay indices for clarity (must be declared before use)
 static constexpr uint8_t RELAY_MOTOR_PWR = 0; // Relay 1
@@ -122,6 +122,28 @@ static volatile TickType_t feedEndTick = 0;           // absolute tick when feed
 static volatile TickType_t retractStartTick = 0;
 static volatile TickType_t retractMaxTicks = 0;
 
+
+struct Kalman1D {
+  float x = 0;   // estimate
+  float p = 1;   // estimate variance
+  float q = 0.01f; // process noise (try 0.001..0.1)
+  float r = 4.0f;  // measurement noise variance (grams^2). try 1..50
+  bool inited = false;
+
+  float update(float z) {
+    if (!inited) { x = z; p = 1; inited = true; return x; }
+    // predict
+    p = p + q;
+    // update
+    float k = p / (p + r);
+    x = x + k * (z - x);
+    p = (1 - k) * p;
+    return x;
+  }
+};
+
+static Kalman1D kf;
+
 // Helpers to control the auto timer lifecycle
 static inline void pauseAutoTimer()
 {
@@ -173,6 +195,34 @@ static inline void setSequenceStatus(const char* text);
 static inline void displaySequenceStatus();
 static inline void displayScheduleCountdown();
 static inline void startTone(int which);
+
+static float median5(float a, float b, float c, float d, float e) {
+  float v[5] = {a,b,c,d,e};
+  // simple sort 5
+  for (int i=0;i<5;i++) for (int j=i+1;j<5;j++) if (v[j] < v[i]) { float t=v[i]; v[i]=v[j]; v[j]=t; }
+  return v[2];
+}
+
+struct WeightFilter {
+  float ema = 0.0f;
+  bool inited = false;
+  float alpha = 0.15f;     // 0.05..0.3 (lower = smoother)
+  float deadband = 2.0f;   // grams, set 0 to disable
+  float lastOut = 0.0f;
+
+  float update(float x) {
+    if (!inited) { ema = x; lastOut = x; inited = true; return x; }
+    ema = ema + alpha * (x - ema);
+    float out = ema;
+    if (deadband > 0.0f && fabsf(out - lastOut) < deadband) out = lastOut;
+    else lastOut = out;
+    return out;
+  }
+};
+
+static WeightFilter wflt;
+
+
 
 // Helper to (re)apply timer configuration from either UI event or persisted settings
 void applySequenceIntervalFromSettings(int minutes)
@@ -229,14 +279,47 @@ void setup()
     Serial.begin(SERIAL_BAUD_RATE);
     M5StamPLC.begin();
 
+    kf.q = 0.001f;   
+    kf.r = 64.0f;    
+
+    // Less jitter: r ↑, q ↓
+    // Faster response: q ↑, r ↓
+
+
+    gBgColor = TFT_RED;
+    M5StamPLC.Display.fillScreen(gBgColor);
+    M5StamPLC.Display.setTextColor(TFT_WHITE, gBgColor);
+
+    M5StamPLC.Display.setCursor(10, 10);
+    M5StamPLC.Display.setTextColor(TFT_WHITE, gBgColor);
+    M5StamPLC.Display.println("BOOT");
+
+
     // Konfigurer UART2 på EXT‑port
     // RX2 = GPIO41 (EXT pin 2), TX2 = GPIO40 (EXT pin 1; ubrukt OK)
-    Serial2.begin(9600, SERIAL_8N1, /*RX*/ 5, /*TX*/ 4);
+    Serial2.begin(9600, SERIAL_8N1, /*RX*/ 4, /*TX*/ 5);
+    if (!Serial2) {
+        M5StamPLC.Display.println("Failed!");
+    }
+    else {
+        M5StamPLC.Display.println("OK");
+    }
 
+    M5StamPLC.Display.println("Setup Scale");
     scale.begin(LOADCELL_SCK_PIN, LOADCELL_DOUT_PIN);
-    // The scale value is the adc value corresponding to 1g
-    scale.set_scale(61.2f); // set scale
-    scale.tare();           // auto set offset
+
+    unsigned long t0 = millis();
+    while (!scale.is_ready() && (millis() - t0) < 1000) {
+    delay(3);
+    }
+
+    if (scale.is_ready()) {
+    scale.set_medavg_mode();   // stable but still responsive
+    scale.tare(15);  // zero
+    M5StamPLC.Display.println("Scale OK");
+    } else {
+    M5StamPLC.Display.println("Scale MISSING");
+    }
 
     // start ESP32-SvelteKit
     esp32sveltekit.begin();
@@ -430,9 +513,7 @@ void setup()
     M5StamPLC.Display.setTextColor(TFT_WHITE, TFT_BLACK);
     M5StamPLC.Display.setTextSize(2);
     // Start with red background during boot/no IP
-    gBgColor = TFT_RED;
-    M5StamPLC.Display.fillScreen(gBgColor);
-    M5StamPLC.Display.setTextColor(TFT_WHITE, gBgColor);
+    
 
     // Boost speaker volume a bit for clearer cues (0-255 typical)
     M5.Speaker.setVolume(220);
@@ -753,16 +834,20 @@ void loop()
 
 void WeightTask(void *param)
 {
-    for (;;)
+  for (;;)
+  {
+
+
+    float filtered = scale.get_units(9);  // smooth input
+
+    if (dataMutex && xSemaphoreTake(dataMutex, portMAX_DELAY) == pdTRUE)
     {
-        float weight = scale.get_units(1);
-        if (dataMutex && xSemaphoreTake(dataMutex, portMAX_DELAY) == pdTRUE)
-        {
-            lastWeight = weight;
-            xSemaphoreGive(dataMutex);
-        }
-        vTaskDelay(WEIGHT_SAMPLE_TICKS);
+      lastWeight = filtered;
+      xSemaphoreGive(dataMutex);
     }
+
+    vTaskDelay(WEIGHT_SAMPLE_TICKS);
+  }
 }
 
 void DistanceTask(void *param)
