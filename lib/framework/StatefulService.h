@@ -9,7 +9,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -31,7 +31,7 @@ enum class StateUpdateResult
 };
 
 template <typename T>
-using JsonStateUpdater = std::function<StateUpdateResult(JsonObject &root, T &settings)>;
+using JsonStateUpdater = std::function<StateUpdateResult(JsonObject &root, T &settings, const String &originId)>;
 
 template <typename T>
 using JsonStateReader = std::function<void(T &settings, JsonObject &root)>;
@@ -47,7 +47,7 @@ typedef struct StateUpdateHandlerInfo
     update_handler_id_t _id;
     StateUpdateCallback _cb;
     bool _allowRemove;
-    StateUpdateHandlerInfo(StateUpdateCallback cb, bool allowRemove) : _id(++currentUpdatedHandlerId), _cb(cb), _allowRemove(allowRemove){};
+    StateUpdateHandlerInfo(StateUpdateCallback cb, bool allowRemove) : _id(++currentUpdatedHandlerId), _cb(cb), _allowRemove(allowRemove) {};
 } StateUpdateHandlerInfo_t;
 
 typedef struct StateHookHandlerInfo
@@ -56,7 +56,7 @@ typedef struct StateHookHandlerInfo
     hook_handler_id_t _id;
     StateHookCallback _cb;
     bool _allowRemove;
-    StateHookHandlerInfo(StateHookCallback cb, bool allowRemove) : _id(++currentHookHandlerId), _cb(cb), _allowRemove(allowRemove){};
+    StateHookHandlerInfo(StateHookCallback cb, bool allowRemove) : _id(++currentHookHandlerId), _cb(cb), _allowRemove(allowRemove) {};
 } StateHookHandlerInfo_t;
 
 template <class T>
@@ -133,7 +133,7 @@ public:
         return result;
     }
 
-    StateUpdateResult updateWithoutPropagation(std::function<StateUpdateResult(T &)> stateUpdater)
+    StateUpdateResult updateWithoutPropagation(std::function<StateUpdateResult(T &)> stateUpdater, const String &originId)
     {
         beginTransaction();
         StateUpdateResult result = stateUpdater(_state);
@@ -144,7 +144,7 @@ public:
     StateUpdateResult update(JsonObject &jsonObject, JsonStateUpdater<T> stateUpdater, const String &originId)
     {
         beginTransaction();
-        StateUpdateResult result = stateUpdater(jsonObject, _state);
+        StateUpdateResult result = stateUpdater(jsonObject, _state, originId);
         endTransaction();
         callHookHandlers(originId, result);
         if (result == StateUpdateResult::CHANGED)
@@ -154,10 +154,10 @@ public:
         return result;
     }
 
-    StateUpdateResult updateWithoutPropagation(JsonObject &jsonObject, JsonStateUpdater<T> stateUpdater)
+    StateUpdateResult updateWithoutPropagation(JsonObject &jsonObject, JsonStateUpdater<T> stateUpdater, const String &originId)
     {
         beginTransaction();
-        StateUpdateResult result = stateUpdater(jsonObject, _state);
+        StateUpdateResult result = stateUpdater(jsonObject, _state, originId);
         endTransaction();
         return result;
     }

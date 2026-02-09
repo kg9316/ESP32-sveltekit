@@ -6,7 +6,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -25,11 +25,14 @@ WiFiSettingsService::WiFiSettingsService(PsychicHttpServer *server,
                                                                 _securityManager(securityManager),
                                                                 _httpEndpoint(WiFiSettings::read, WiFiSettings::update, this, server, WIFI_SETTINGS_SERVICE_PATH, securityManager,
                                                                               AuthenticationPredicates::IS_ADMIN),
-                                                                _fsPersistence(WiFiSettings::read, WiFiSettings::update, this, fs, WIFI_SETTINGS_FILE), _lastConnectionAttempt(0),
+                                                                _fsPersistence(WiFiSettings::read, WiFiSettings::update, this, fs, WIFI_SETTINGS_FILE),
+                                                                _lastConnectionAttempt(0),
+                                                                _delayedReconnectTime(0),
+                                                                _delayedReconnectPending(false),
                                                                 _socket(socket)
 {
     addUpdateHandler([&](const String &originId)
-                     { reconfigureWiFiConnection(); },
+                     { delayedReconnect(); },
                      false);
 }
 
@@ -54,8 +57,22 @@ void WiFiSettingsService::initWiFi()
 void WiFiSettingsService::begin()
 {
     _socket->registerEvent(EVENT_RSSI);
+    _socket->registerEvent(EVENT_RECONNECT);
 
     _httpEndpoint.begin();
+}
+
+void WiFiSettingsService::delayedReconnect()
+{
+    _delayedReconnectTime = millis() + DELAYED_RECONNECT_MS;
+    _delayedReconnectPending = true;
+    ESP_LOGI(SVK_TAG, "Delayed WiFi reconnection scheduled in %d ms", DELAYED_RECONNECT_MS);
+
+    // Emit event to notify clients of impending reconnection
+    JsonDocument doc;
+    doc["delay_ms"] = DELAYED_RECONNECT_MS;
+    JsonObject jsonObject = doc.as<JsonObject>();
+    _socket->emitEvent(EVENT_RECONNECT, jsonObject);
 }
 
 void WiFiSettingsService::reconfigureWiFiConnection()
@@ -93,6 +110,15 @@ void WiFiSettingsService::reconfigureWiFiConnection()
 void WiFiSettingsService::loop()
 {
     unsigned long currentMillis = millis();
+
+    // Handle delayed reconnection
+    if (_delayedReconnectPending && currentMillis >= _delayedReconnectTime)
+    {
+        _delayedReconnectPending = false;
+        ESP_LOGI(SVK_TAG, "Executing delayed WiFi reconnection");
+        reconfigureWiFiConnection();
+    }
+
     if (!_lastConnectionAttempt || (unsigned long)(currentMillis - _lastConnectionAttempt) >= WIFI_RECONNECTION_DELAY)
     {
         _lastConnectionAttempt = currentMillis;
@@ -127,9 +153,7 @@ void WiFiSettingsService::manageSTA()
     {
         return;
     }
-
-    // Connect or reconnect as required
-    if ((WiFi.getMode() & WIFI_STA) == 0)
+    else
     {
 #ifdef SERIAL_INFO
         Serial.println("Connecting to WiFi...");
@@ -206,8 +230,7 @@ void WiFiSettingsService::connectToWiFi()
             }
         }
 
-        // if configured to prioritize signal strength, use the best network else use the first available network
-        // if (_state.priorityBySignalStrength == false)
+        // Connection mode PRIORITY: connect to the first available network
         if (_state.staConnectionMode == (u_int8_t)STAConnectionMode::PRIORITY)
         {
             for (auto &network : _state.wifiSettings)
@@ -220,14 +243,28 @@ void WiFiSettingsService::connectToWiFi()
                 }
             }
         }
-        else if (_state.staConnectionMode == (u_int8_t)STAConnectionMode::STRENGTH && bestNetwork)
+        // Connection mode STRENGTH: connect to the strongest network
+        else if (_state.staConnectionMode == (u_int8_t)STAConnectionMode::STRENGTH)
         {
-            ESP_LOGI(SVK_TAG, "Connecting to strongest network: %s, BSSID: " MACSTR " ", bestNetwork->ssid.c_str(), MAC2STR(bestNetwork->bssid));
-            configureNetwork(*bestNetwork);
+            if (bestNetwork)
+            {
+                ESP_LOGI(SVK_TAG, "Connecting to strongest network: %s, BSSID: " MACSTR " ", bestNetwork->ssid.c_str(), MAC2STR(bestNetwork->bssid));
+                configureNetwork(*bestNetwork);
+            }
+            else
+            {
+                ESP_LOGI(SVK_TAG, "No suitable network found.");
+            }
         }
-        else // no suitable network to connect
+        // Connection mode OFFLINE: do not connect to any network
+        else if (_state.staConnectionMode == (u_int8_t)STAConnectionMode::OFFLINE)
         {
-            ESP_LOGI(SVK_TAG, "No known networks found.");
+            ESP_LOGI(SVK_TAG, "WiFi connection mode is OFFLINE, not connecting to any network.");
+        }
+        // Connection mode is unknown: do not connect to any network
+        else
+        {
+            ESP_LOGE(SVK_TAG, "Unknown connection mode, not connecting to any network.");
         }
 
         // delete scan results
@@ -269,7 +306,7 @@ void WiFiSettingsService::updateRSSI()
 
 void WiFiSettingsService::onStationModeDisconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 {
-    WiFi.disconnect(true);
+    manageSTA();
 }
 
 void WiFiSettingsService::onStationModeStop(WiFiEvent_t event, WiFiEventInfo_t info)

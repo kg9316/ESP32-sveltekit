@@ -6,7 +6,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2024 theelims
+ *   Copyright (C) 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -23,6 +23,10 @@ ESP32SvelteKit::ESP32SvelteKit(PsychicHttpServer *server, unsigned int numberEnd
                                                                                           _wifiStatus(server, &_securitySettingsService),
                                                                                           _apSettingsService(server, &ESPFS, &_securitySettingsService),
                                                                                           _apStatus(server, &_securitySettingsService, &_apSettingsService),
+#if FT_ENABLED(FT_ETHERNET)
+                                                                                          _ethernetSettingsService(server, &ESPFS, &_securitySettingsService, &_socket),
+                                                                                          _ethernetStatus(server, &_securitySettingsService),
+#endif
                                                                                           _socket(server, &_securitySettingsService, AuthenticationPredicates::IS_AUTHENTICATED),
                                                                                           _notificationService(&_socket),
 #if FT_ENABLED(FT_NTP)
@@ -64,6 +68,10 @@ void ESP32SvelteKit::begin()
 {
     ESP_LOGV(SVK_TAG, "Loading settings from files system");
     ESPFS.begin(true);
+
+#if FT_ENABLED(FT_ETHERNET)
+    _ethernetSettingsService.initEthernet();
+#endif
 
     _wifiSettingsService.initWiFi();
 
@@ -150,6 +158,11 @@ void ESP32SvelteKit::begin()
     _wifiSettingsService.begin();
     _wifiScanner.begin();
     _wifiStatus.begin();
+#if FT_ENABLED(FT_ETHERNET)
+    _ethernetSettingsService.begin();
+    _ethernetStatus.begin();
+#endif
+
 
 #if FT_ENABLED(FT_COREDUMP)
     _coreDump.begin();
@@ -180,6 +193,14 @@ void ESP32SvelteKit::begin()
 
 #if FT_ENABLED(FT_SLEEP)
     _sleepService.begin();
+    _sleepService.attachOnSleepCallback([&]()
+                                        {   ESP_LOGI(SVK_TAG, "Attempting to stop server");
+                                            for (auto client : _server->getClientList())
+                                            {
+                                                client->close();
+                                            }
+                                            vTaskDelete(_loopTaskHandle);
+                                            ESP_LOGI(SVK_TAG, "Server stopped"); });
 #if FT_ENABLED(FT_MQTT)
     _sleepService.attachOnSleepCallback([&]()
                                         { _mqttSettingsService.disconnect(); });
@@ -202,7 +223,7 @@ void ESP32SvelteKit::begin()
         4096,                       // Stack size (bytes)
         this,                       // Pass reference to this class instance
         (tskIDLE_PRIORITY + 2),     // task priority
-        NULL,                       // Task handle
+        &_loopTaskHandle,           // Task handle
         ESP32SVELTEKIT_RUNNING_CORE // Pin to application core
     );
 }
@@ -215,6 +236,10 @@ void ESP32SvelteKit::_loop()
     bool ap = false;
     bool event = false;
     bool mqtt = false;
+#if FT_ENABLED(FT_ETHERNET)
+    bool eth = false;
+#endif
+    bool wifi_eth_combined = false;
 
     while (1)
     {
@@ -226,9 +251,15 @@ void ESP32SvelteKit::_loop()
 #if FT_ENABLED(FT_ANALYTICS)
         _analyticsService.loop();
 #endif
+#if FT_ENABLED(FT_ETHERNET)
+        _ethernetSettingsService.loop();
+        eth = _ethernetStatus.isConnected();
+        if (eth) { wifi_eth_combined = true; }
+#endif
 
         // Query the connectivity status
         wifi = _wifiStatus.isConnected();
+        if (wifi) { wifi_eth_combined = true; }
         ap = _apStatus.isActive();
         event = _socket.getConnectedClients() > 0;
 #if FT_ENABLED(FT_MQTT)
@@ -236,11 +267,11 @@ void ESP32SvelteKit::_loop()
 #endif
 
         // Update the system status
-        if (wifi && mqtt)
+        if (wifi_eth_combined && mqtt)
         {
             _connectionStatus = ConnectionStatus::STA_MQTT;
         }
-        else if (wifi)
+        else if (wifi_eth_combined)
         {
             _connectionStatus = event ? ConnectionStatus::STA_CONNECTED : ConnectionStatus::STA;
         }

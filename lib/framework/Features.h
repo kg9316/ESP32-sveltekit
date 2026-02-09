@@ -9,7 +9,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -65,6 +65,11 @@
 // Endpoint for Core Dump, off by default
 #ifndef FT_COREDUMP
 #define FT_COREDUMP 0
+#endif
+
+// Ethernet feature off by default
+#ifndef FT_ETHERNET
+#define FT_ETHERNET 0
 #endif
 
 #endif

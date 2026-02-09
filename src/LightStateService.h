@@ -9,7 +9,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -57,7 +57,7 @@ public:
     root["auto_interval_min"] = settings.auto_interval_min;
     }
 
-    static StateUpdateResult update(JsonObject &root, LightState &lightState)
+    static StateUpdateResult update(JsonObject &root, LightState &lightState, const String& originID)
     {
         StateUpdateResult result = StateUpdateResult::UNCHANGED;
         bool newLed = root["led_on"] | DEFAULT_LED_STATE;
@@ -109,7 +109,7 @@ public:
         root["state"] = settings.ledOn ? ON_STATE : OFF_STATE;
     }
 
-    static StateUpdateResult homeAssistUpdate(JsonObject &root, LightState &lightState)
+    static StateUpdateResult homeAssistUpdate(JsonObject &root, LightState &lightState, const String& originID)
     {
         String state = root["state"];
         // parse new led state

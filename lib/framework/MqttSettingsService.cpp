@@ -6,7 +6,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -210,6 +210,8 @@ void MqttSettingsService::configureMqtt()
         _mqttClient.setWill(_retainedWillTopic, 1, true, _retainedWillPayload);
         _mqttClient.setCleanSession(_state.cleanSession);
         _mqttClient.connect();
+
+        MqttCommitHandler::setTimerInterval(_state.messageIntervalMs);
     }
 }
 
@@ -237,6 +239,9 @@ String MqttSettingsService::getStatusTopic()
 
 void MqttSettingsService::disconnect()
 {
+    // disable MQTT message commit timer, if disconnected
+    MqttCommitHandler::setTimerInterval(0);
+
     // disconnect if currently connected
     if (_mqttClient.connected())
     {

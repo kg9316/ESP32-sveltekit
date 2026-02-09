@@ -9,7 +9,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -63,7 +63,7 @@ public:
         root["tz_format"] = settings.tzFormat;
     }
 
-    static StateUpdateResult update(JsonObject &root, NTPSettings &settings)
+    static StateUpdateResult update(JsonObject &root, NTPSettings &settings, const String &originId)
     {
         settings.enabled = root["enabled"] | FACTORY_NTP_ENABLED;
         settings.server = root["server"] | FACTORY_NTP_SERVER;
@@ -86,8 +86,8 @@ private:
     HttpEndpoint<NTPSettings> _httpEndpoint;
     FSPersistence<NTPSettings> _fsPersistence;
 
-    void onStationModeGotIP(WiFiEvent_t event, WiFiEventInfo_t info);
-    void onStationModeDisconnected(WiFiEvent_t event, WiFiEventInfo_t info);
+    void onNetworkGotIP(WiFiEvent_t event, WiFiEventInfo_t info);
+    void onNetworkDisconnected(WiFiEvent_t event, WiFiEventInfo_t info);
     void configureNTP();
     esp_err_t configureTime(PsychicRequest *request, JsonVariant &json);
 };

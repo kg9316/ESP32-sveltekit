@@ -8,7 +8,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -24,7 +24,6 @@
 
 #include <WiFiClientSecure.h>
 #include <HTTPUpdate.h>
-// #include <SSLCertBundle.h>
 
 #define GITHUB_FIRMWARE_PATH "/rest/downloadUpdate"
 #define EVENT_DOWNLOAD_OTA "otastatus"

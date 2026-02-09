@@ -6,7 +6,7 @@
  *   https://github.com/theelims/ESP32-sveltekit
  *
  *   Copyright (C) 2018 - 2023 rjwats
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -125,6 +125,12 @@ void FeaturesService::createJSON(JsonObject &root)
     root["event_use_json"] = true;
 #else
     root["event_use_json"] = false;
+#endif
+
+#if FT_ENABLED(FT_ETHERNET)
+    root["ethernet"] = true;
+#else
+    root["ethernet"] = false;
 #endif
 
     root["firmware_version"] = APP_VERSION;

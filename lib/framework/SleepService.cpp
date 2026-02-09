@@ -5,7 +5,7 @@
  *   with responsive Sveltekit front-end built with TailwindCSS and DaisyUI.
  *   https://github.com/theelims/ESP32-sveltekit
  *
- *   Copyright (C) 2023 - 2024 theelims
+ *   Copyright (C) 2023 - 2025 theelims
  *
  *   All Rights Reserved. This software may be modified and distributed under
  *   the terms of the LGPL v3 license. See the LICENSE file for details.
@@ -68,13 +68,10 @@ void SleepService::sleepNow()
         callback();
     }
 
-    delay(100);
-
     MDNS.end();
     delay(100);
-
     WiFi.disconnect(true);
-    delay(500);
+    delay(200);
 
     // set pin function of _wakeUpPin
     pinMode(_wakeUpPin, INPUT);
@@ -83,7 +80,7 @@ void SleepService::sleepNow()
     ESP_LOGD(SVK_TAG, "Current level on GPIO%d: %d\n", _wakeUpPin, digitalRead(_wakeUpPin));
 
 // special treatment for ESP32-C3 / C6 because of the RISC-V architecture
-#ifdef CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C6
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
     esp_deep_sleep_enable_gpio_wakeup(BIT(_wakeUpPin), (esp_deepsleep_gpio_wake_up_mode_t)_wakeUpSignal);
 #else
     esp_sleep_enable_ext1_wakeup(BIT(_wakeUpPin), (esp_sleep_ext1_wakeup_mode_t)_wakeUpSignal);
@@ -111,13 +108,7 @@ void SleepService::sleepNow()
     Serial.println("Good by!");
 #endif
 
-    xTaskCreate(
-        [](void *pvParams)
-        {
-            delay(100);
-            esp_deep_sleep_start();
-        },
-        "Sleep task", 4096, nullptr, 10, nullptr);
+    esp_deep_sleep_start();
 }
 
 void SleepService::setWakeUpPin(int pin, bool level, pinTermination termination)
